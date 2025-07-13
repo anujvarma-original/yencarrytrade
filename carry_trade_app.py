@@ -14,7 +14,10 @@ def load_model():
         # Simulated placeholder classifier
         class DummyModel:
             def predict(self, X):
-                return ["High" if vix > 20 and vol > 0.01 else "Low" for vix, vol in zip(X["VIX"], X["FX_vol"])]
+                return [
+                    "High" if float(vix) > 20 and float(vol) > 0.01 else "Low"
+                    for vix, vol in zip(X["VIX"].values, X["FX_vol"].values)
+                ]
         return DummyModel()
 
 # Get current market data

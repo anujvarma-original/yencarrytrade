@@ -5,7 +5,8 @@ import numpy as np
 import yfinance as yf
 from sklearn.ensemble import RandomForestClassifier
 from joblib import load
-from twilio.rest import Client
+import smtplib
+from email.mime.text import MIMEText
 
 # Load or simulate model (replace with actual trained model path)
 def load_model():
@@ -44,22 +45,21 @@ def fetch_data():
 
     return X_today
 
-# Send SMS alert if risk is HIGH
-def send_sms_alert(risk_level):
-    if risk_level != "Low":
+# Send email alert if risk is HIGH
+def send_email_alert(risk_level):
+    if risk_level != "High":
         return
 
-    twilio_sid = st.secrets["twilio"]["account_sid"]
-    twilio_token = st.secrets["twilio"]["auth_token"]
-    from_number = st.secrets["twilio"]["from_number"]
-    to_number = st.secrets["twilio"]["to_number"]
+    email_cfg = st.secrets["email"]
 
-    client = Client(twilio_sid, twilio_token)
-    client.messages.create(
-        body="⚠️ Alert: Today's carry trade risk is HIGH.",
-        from_=from_number,
-        to=to_number
-    )
+    msg = MIMEText("\u26a0\ufe0f Alert: Today's carry trade risk is HIGH.")
+    msg["Subject"] = "Yen Carry Trade Risk Alert"
+    msg["From"] = email_cfg["from"]
+    msg["To"] = email_cfg["to"]
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(email_cfg["from"], email_cfg["password"])
+        server.send_message(msg)
 
 # Streamlit app
 st.title("Yen Carry Trade Risk Tracker")
@@ -68,7 +68,7 @@ st.markdown("Updated daily with live FX and VIX data")
 model = load_model()
 data_today = fetch_data()
 risk_prediction = model.predict(data_today)[0]
-send_sms_alert(risk_prediction)
+send_email_alert(risk_prediction)
 
 st.metric(label="Today's Carry Trade Risk", value=risk_prediction)
 st.write("**Inputs:**")

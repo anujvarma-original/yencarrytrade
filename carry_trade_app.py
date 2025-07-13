@@ -174,7 +174,7 @@ def send_email_alert(risk_level):
     email_cfg = st.secrets["email"]
 
     msg = MIMEText("\u26a0\ufe0f Alert: Today's carry trade risk is HIGH.")
-    msg["Subject"] = "Yen Carry Trade Risk Alert"
+    msg["Subject"] = "StreamLit - Yen Carry Trade Risk Alert"
     msg["From"] = email_cfg["from"]
     msg["To"] = email_cfg["to"]
 

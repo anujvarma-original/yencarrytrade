@@ -47,7 +47,7 @@ def fetch_data():
 
 # Send email alert if risk is HIGH
 def send_email_alert(risk_level):
-    if risk_level != "High":
+    if risk_level != "Low":
         return
 
     email_cfg = st.secrets["email"]

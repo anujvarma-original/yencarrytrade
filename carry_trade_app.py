@@ -46,7 +46,7 @@ def fetch_data():
 
 # Send SMS alert if risk is HIGH
 def send_sms_alert(risk_level):
-    if risk_level != "High":
+    if risk_level != "Low":
         return
 
     twilio_sid = st.secrets["twilio"]["account_sid"]

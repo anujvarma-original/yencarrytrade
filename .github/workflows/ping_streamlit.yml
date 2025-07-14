@@ -1,5 +1,4 @@
-# .github/workflows/ping_streamlit.yml
-name: Ping Streamlit App Twice Daily
+name: Wake Streamlit App Twice Daily
 
 on:
   schedule:
@@ -7,8 +6,28 @@ on:
   workflow_dispatch:
 
 jobs:
-  ping:
+  wake-streamlit:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping the Streamlit app
-        run: curl -sSL https://yencarrytrade.streamlit.app/
+      - name: Warm up sleeping Streamlit app with browser-style curl
+        run: |
+          echo "Waking Streamlit app at https://yencarrytrade.streamlit.app/"
+
+          for i in {1..8}; do
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+              https://yencarrytrade.streamlit.app/)
+
+            echo "Attempt $i: HTTP $HTTP_STATUS"
+
+            if [ "$HTTP_STATUS" -eq 200 ]; then
+              echo "✅ Streamlit app is awake and responsive."
+              exit 0
+            fi
+
+            echo "⏳ Still sleeping... waiting 15 seconds before retrying."
+            sleep 15
+          done
+
+          echo "❌ Failed to wake Streamlit app after 8 attempts."
+          exit 1

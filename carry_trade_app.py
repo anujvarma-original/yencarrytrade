@@ -1,4 +1,4 @@
-# carry_trade_app.py (fixed ValueError for string formatting)
+# carry_trade_app.py (corrected formatting bug for email metric values)
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -6,7 +6,10 @@ import datetime
 import smtplib
 from email.mime.text import MIMEText
 import os
+import matplotlib.pyplot as plt
 
+st.set_page_config(page_title="Yen Carry Trade Risk Monitor", layout="centered")
+st.title("\U0001F4B4 Yen Carry Trade Risk - Live Tracker")
 FLAG_FILE = "/tmp/last_alert_yencarrytrade.txt"
 
 def compute_risk(vix, fx_vol):
@@ -38,18 +41,13 @@ def send_email_alert(risk_level, data_today):
     email_cfg = st.secrets["email"]
     timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
-    if isinstance(data_today, pd.Series):
-        metrics = "\n".join(
-            f"{col}: {float(data_today[col]):.4f}" if isinstance(data_today[col], (int, float)) else f"{col}: {data_today[col]}"
-            for col in data_today.index
-        )
-    elif isinstance(data_today, pd.DataFrame):
-        metrics = "\n".join(
-            f"{col}: {float(data_today.iloc[0][col]):.4f}" if isinstance(data_today.iloc[0][col], (int, float)) else f"{col}: {data_today.iloc[0][col]}"
-            for col in data_today.columns
-        )
-    else:
-        metrics = "Invalid data format"
+    if isinstance(data_today, pd.DataFrame):
+        data_today = data_today.iloc[0]
+
+    metrics = "\n".join(
+        f"{col}: {val:.4f}" if isinstance(val, (int, float)) and not isinstance(val, bool) else f"{col}: {val}"
+        for col, val in data_today.items()
+    )
 
     body = f"""\u26a0\ufe0f Carry Trade Risk Alert
 

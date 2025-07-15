@@ -10,7 +10,7 @@ import os
 
 # Set Streamlit page config
 st.set_page_config(page_title="Yen Carry Trade Risk Monitor", layout="centered")
-st.title("💴 Yen Carry Trade Risk - 12 Year Highs")
+st.title("\U0001F4B4 Yen Carry Trade Risk - 12 Year Highs")
 
 FLAG_FILE = "/tmp/last_alert_yencarrytrade.txt"
 
@@ -62,12 +62,12 @@ def send_email_alert(risk_level, data_today):
         f"{col}: {data_today[col].values[0]:.4f}" for col in data_today.columns
     )
 
-    body = f"""⚠️ Carry Trade Risk Alert
+    body = f"""\u26a0\ufe0f Carry Trade Risk Alert
 
 Risk Level: {risk_level.upper()}
 Timestamp: {timestamp}
 
-📊 Market Inputs:
+\ud83d\udcca Market Inputs:
 {metrics}
 """
 
@@ -113,16 +113,15 @@ data = data.sort_index(ascending=False)
 # Display current risk
 current_risk = data.iloc[0]["Risk"]
 current_date = data.index[0].strftime("%Y-%m-%d")
-st.subheader(f"📊 Current Risk as of {current_date}")
-
+st.subheader(f"\U0001F4CA Current Carry Trade Risk as of {current_date}")
 color_map = {"HIGH": "🔴 HIGH", "MEDIUM": "🟡 MEDIUM", "LOW": "🟢 LOW"}
-st.markdown(f"### **Current Carry Trade Risk: {color_map.get(current_risk, current_risk)}**")
+st.markdown(f"### **{color_map.get(current_risk, current_risk)}**")
 
 # Send email alert if eligible
 send_email_alert(current_risk, data.iloc[[0]].copy())
 
 # Display chart for last 12 months
-st.subheader("📈 Risk Trend Over Last 12 Months")
+st.subheader("\U0001F4C8 Risk Trend Over Last 12 Months")
 data_12mo = data.sort_index().last("365D").copy()
 data_12mo["Risk_Level"] = data_12mo["Risk"].map({"HIGH": 3, "MEDIUM": 2, "LOW": 1})
 
@@ -136,14 +135,15 @@ ax.set_ylabel("Risk Level")
 plt.grid(True)
 st.pyplot(fig)
 
-# Display HIGH risk instances
+# Display HIGH risk instances sorted by date descending
 data_high = data[data["Risk"] == "HIGH"].copy()
 data_high.reset_index(inplace=True)
 data_high.rename(columns={"index": "Date"}, inplace=True)
 data_high["Date"] = data_high["Date"].dt.strftime("%Y-%m-%d")
+data_high = data_high.sort_values("Date", ascending=False)
 
 if not data_high.empty:
-    st.subheader("📅 All Dates With HIGH Risk (Last 12 Years)")
+    st.subheader("\U0001F4C5 All Dates With HIGH Risk (Last 12 Years)")
     styled_df = data_high[["Date", "VIX", "UVXY", "FX_vol", "Risk"]].style.applymap(risk_color, subset=["Risk"])
     st.dataframe(styled_df, use_container_width=True)
 else:

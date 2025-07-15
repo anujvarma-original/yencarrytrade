@@ -1,63 +1,70 @@
+# yencarrytrade.py (patched for scalar value DataFrame fix and historical high-risk tracking)
+import streamlit as st
 import yfinance as yf
 import pandas as pd
 import datetime
-import streamlit as st
+import matplotlib.pyplot as plt
+
+# Set Streamlit page config
+st.set_page_config(page_title="Yen Carry Trade Risk Monitor", layout="centered")
+st.title("💴 Yen Carry Trade Risk - 12 Year Highs")
 
 # Function to compute risk level
 def compute_risk(vix, fx_vol):
     if vix > 20 and fx_vol > 0.01:
-        return "High"
+        return "HIGH"
     elif vix > 15:
-        return "Medium"
+        return "MEDIUM"
     else:
-        return "Low"
+        return "LOW"
 
-# Set Streamlit config
-st.set_page_config(page_title="Yen Carry Trade Risk Analysis", layout="centered")
-st.title("📊 12-Year Carry Trade Risk Analysis (Weekly)")
-st.caption("Filtering historical HIGH risk periods with corresponding VIX and UVXY values")
+# Download historical data for VIX and USD/JPY
+end = datetime.date.today()
+start = end - datetime.timedelta(days=365 * 12)
 
-# Time range: last 12 years
-end_date = datetime.datetime.today()
-start_date = end_date - datetime.timedelta(weeks=52 * 12)
+vix_data = yf.download("^VIX", start=start, end=end, interval="1wk")
+uvxy_data = yf.download("UVXY", start=start, end=end, interval="1wk")
+fx_data = yf.download("JPY=X", start=start, end=end, interval="1wk")
 
-# Download weekly data
-with st.spinner("Downloading weekly data from Yahoo Finance..."):
-    vix_data = yf.download("^VIX", start=start_date, end=end_date, interval="1wk")["Close"]
-    fx_data = yf.download("JPY=X", start=start_date, end=end_date, interval="1wk")["Close"]
-    uvxy_data = yf.download("UVXY", start=start_date, end=end_date, interval="1wk")["Close"]
+if vix_data.empty or fx_data.empty or uvxy_data.empty:
+    st.error("Failed to download market data.")
+    st.stop()
 
-# Compute FX weekly volatility
-fx_vol = fx_data.pct_change().rolling(window=2).std()
+# Calculate FX weekly returns as volatility proxy
+fx_data["FX_vol"] = fx_data["Close"].pct_change().rolling(window=4).std()
 
-# Combine into one DataFrame
-combined = pd.DataFrame({
-    "VIX": vix_data,
-    "FX_vol": fx_vol,
-    "UVXY": uvxy_data
-}).dropna()
+# Align all dataframes on date index
+data = pd.DataFrame(index=vix_data.index)
+data["VIX"] = vix_data["Close"]
+data["UVXY"] = uvxy_data["Close"]
+data["FX_vol"] = fx_data["FX_vol"]
+data = data.dropna()
 
-# Calculate risk level
-combined["Risk"] = combined.apply(lambda row: compute_risk(row["VIX"], row["FX_vol"]), axis=1)
+# Compute risk level for each week
+data["Risk"] = data.apply(lambda row: compute_risk(row["VIX"], row["FX_vol"]), axis=1)
 
-# Filter rows where risk is HIGH
-high_risk = combined[combined["Risk"] == "High"].copy()
-high_risk.reset_index(inplace=True)
-high_risk["Date"] = high_risk["Date"].dt.strftime("%Y-%m-%d")
-high_risk["Yen Carry Trade Risk"] = "HIGH"
+# Filter only HIGH risk dates
+data_high = data[data["Risk"] == "HIGH"]
 
-# Select and rename columns
-display_df = high_risk[["Date", "VIX", "UVXY", "Yen Carry Trade Risk"]].copy()
-display_df.columns = ["Date", "VIX Value", "UVXY Value", "Yen Carry Trade Risk"]
+# Build display table for HIGH risk instances
+display_rows = []
+for idx, row in data_high.iterrows():
+    display_rows.append({
+        "Date": idx.strftime("%Y-%m-%d"),
+        "VIX Value": round(row["VIX"], 2),
+        "UVXY Value": round(row["UVXY"], 2),
+        "Yen Carry Trade Risk": "HIGH"
+    })
 
-# Output to console
-print("🔺 High Risk Weeks Over the Last 12 Years:")
-print(display_df.to_string(index=False))
+# Convert to DataFrame
+risk_df = pd.DataFrame(display_rows)
 
-# Output to Streamlit
-if not display_df.empty:
-    st.success("High risk events retrieved successfully!")
-    st.write("### 📅 Historical High Risk Events")
-    st.dataframe(display_df, use_container_width=True)
+# Show the table in Streamlit and console
+if not risk_df.empty:
+    st.subheader("📅 All Dates With HIGH Risk (Last 12 Years)")
+    st.dataframe(risk_df, use_container_width=True)
+    print("\nYen Carry Trade - HIGH Risk Events")
+    print(risk_df.to_string(index=False))
 else:
-    st.warning("No HIGH risk events found in the 12-year period.")
+    st.info("No HIGH risk levels detected in the past 12 years.")
+    print("No HIGH risk levels detected.")

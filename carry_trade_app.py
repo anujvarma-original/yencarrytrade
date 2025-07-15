@@ -1,13 +1,18 @@
-# yencarrytrade.py (updated with sorting and color-coded risk)
+# yencarrytrade.py (updated with sorting, chart, color-coded risk, and email alerts)
 import streamlit as st
 import yfinance as yf
 import pandas as pd
 import datetime
 import matplotlib.pyplot as plt
+import smtplib
+from email.mime.text import MIMEText
+import os
 
 # Set Streamlit page config
 st.set_page_config(page_title="Yen Carry Trade Risk Monitor", layout="centered")
 st.title("💴 Yen Carry Trade Risk - 12 Year Highs")
+
+FLAG_FILE = "/tmp/last_alert_yencarrytrade.txt"
 
 # Function to compute risk level
 def compute_risk(vix, fx_vol):
@@ -28,6 +33,54 @@ def risk_color(risk):
         return "background-color: #ccffcc"  # Green
     else:
         return ""
+
+# Check if it's time to send alert
+def should_send_alert():
+    if not os.path.exists(FLAG_FILE):
+        return True
+    try:
+        with open(FLAG_FILE, "r") as f:
+            last_time = datetime.datetime.fromisoformat(f.read().strip())
+        return (datetime.datetime.utcnow() - last_time).total_seconds() > 43200  # 12 hours
+    except:
+        return True
+
+# Update alert timestamp
+def update_alert_timestamp():
+    with open(FLAG_FILE, "w") as f:
+        f.write(datetime.datetime.utcnow().isoformat())
+
+# Send email alert
+def send_email_alert(risk_level, data_today):
+    if not should_send_alert():
+        return
+
+    email_cfg = st.secrets["email"]
+
+    timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    metrics = "\n".join(
+        f"{col}: {data_today[col].values[0]:.4f}" for col in data_today.columns
+    )
+
+    body = f"""⚠️ Carry Trade Risk Alert
+
+Risk Level: {risk_level.upper()}
+Timestamp: {timestamp}
+
+📊 Market Inputs:
+{metrics}
+"""
+
+    msg = MIMEText(body)
+    msg["Subject"] = f"Carry Trade Risk Alert: {risk_level.upper()}"
+    msg["From"] = email_cfg["from"]
+    msg["To"] = email_cfg["to"]
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(email_cfg["from"], email_cfg["password"])
+        server.send_message(msg)
+
+    update_alert_timestamp()
 
 # Download historical data
 end = datetime.date.today()
@@ -57,7 +110,7 @@ data["Risk"] = data.apply(lambda row: compute_risk(row["VIX"], row["FX_vol"]), a
 # Sort by most recent date
 data = data.sort_index(ascending=False)
 
-# Display most recent week's risk with color
+# Display current risk
 current_risk = data.iloc[0]["Risk"]
 current_date = data.index[0].strftime("%Y-%m-%d")
 st.subheader(f"📊 Current Risk as of {current_date}")
@@ -65,7 +118,25 @@ st.subheader(f"📊 Current Risk as of {current_date}")
 color_map = {"HIGH": "🔴 HIGH", "MEDIUM": "🟡 MEDIUM", "LOW": "🟢 LOW"}
 st.markdown(f"### **Current Carry Trade Risk: {color_map.get(current_risk, current_risk)}**")
 
-# Filter HIGH risk only and display
+# Send email alert if eligible
+send_email_alert(current_risk, data.iloc[[0]].copy())
+
+# Display chart for last 12 months
+st.subheader("📈 Risk Trend Over Last 12 Months")
+data_12mo = data.sort_index().last("365D").copy()
+data_12mo["Risk_Level"] = data_12mo["Risk"].map({"HIGH": 3, "MEDIUM": 2, "LOW": 1})
+
+fig, ax = plt.subplots(figsize=(10, 3))
+ax.plot(data_12mo.index, data_12mo["Risk_Level"], drawstyle='steps-post')
+ax.set_yticks([1, 2, 3])
+ax.set_yticklabels(["LOW", "MEDIUM", "HIGH"])
+ax.set_title("Carry Trade Risk Levels Over Last 12 Months")
+ax.set_xlabel("Date")
+ax.set_ylabel("Risk Level")
+plt.grid(True)
+st.pyplot(fig)
+
+# Display HIGH risk instances
 data_high = data[data["Risk"] == "HIGH"].copy()
 data_high.reset_index(inplace=True)
 data_high.rename(columns={"index": "Date"}, inplace=True)

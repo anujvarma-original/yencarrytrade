@@ -165,16 +165,18 @@ def update_alert_timestamp():
         f.write(datetime.datetime.utcnow().isoformat())
 
 # Send email alert if risk is HIGH
+# Send email alert for any risk level, every 12 hours
 def send_email_alert(risk_level):
-    if risk_level != "High":
-        return
     if not should_send_alert():
         return
 
     email_cfg = st.secrets["email"]
 
-    msg = MIMEText("\u26a0\ufe0f Alert: Today's carry trade risk is HIGH.")
-    msg["Subject"] = "StreamLit - Yen Carry Trade Risk Alert"
+    body = f"⚠️ Alert: Today's carry trade risk level is **{risk_level.upper()}**."
+    subject = f"Carry Trade Risk Alert: {risk_level.upper()}"
+
+    msg = MIMEText(body)
+    msg["Subject"] = subject
     msg["From"] = email_cfg["from"]
     msg["To"] = email_cfg["to"]
 

@@ -1,4 +1,4 @@
-# yencarrytrade.py (patched for scalar value DataFrame fix and historical high-risk tracking)
+# yencarrytrade.py (updated with sorting and color-coded risk)
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -18,7 +18,18 @@ def compute_risk(vix, fx_vol):
     else:
         return "LOW"
 
-# Download historical data for VIX and USD/JPY
+# Function to color risk levels
+def risk_color(risk):
+    if risk == "HIGH":
+        return "background-color: #ffcccc"  # Red
+    elif risk == "MEDIUM":
+        return "background-color: #ffffcc"  # Yellow
+    elif risk == "LOW":
+        return "background-color: #ccffcc"  # Green
+    else:
+        return ""
+
+# Download historical data
 end = datetime.date.today()
 start = end - datetime.timedelta(days=365 * 12)
 
@@ -30,41 +41,39 @@ if vix_data.empty or fx_data.empty or uvxy_data.empty:
     st.error("Failed to download market data.")
     st.stop()
 
-# Calculate FX weekly returns as volatility proxy
+# Calculate FX volatility
 fx_data["FX_vol"] = fx_data["Close"].pct_change().rolling(window=4).std()
 
-# Align all dataframes on date index
+# Align and merge data
 data = pd.DataFrame(index=vix_data.index)
 data["VIX"] = vix_data["Close"]
 data["UVXY"] = uvxy_data["Close"]
 data["FX_vol"] = fx_data["FX_vol"]
 data = data.dropna()
 
-# Compute risk level for each week
+# Compute risk level
 data["Risk"] = data.apply(lambda row: compute_risk(row["VIX"], row["FX_vol"]), axis=1)
 
-# Filter only HIGH risk dates
-data_high = data[data["Risk"] == "HIGH"]
+# Sort by most recent date
+data = data.sort_index(ascending=False)
 
-# Build display table for HIGH risk instances
-display_rows = []
-for idx, row in data_high.iterrows():
-    display_rows.append({
-        "Date": idx.strftime("%Y-%m-%d"),
-        "VIX Value": round(row["VIX"], 2),
-        "UVXY Value": round(row["UVXY"], 2),
-        "Yen Carry Trade Risk": "HIGH"
-    })
+# Display most recent week's risk with color
+current_risk = data.iloc[0]["Risk"]
+current_date = data.index[0].strftime("%Y-%m-%d")
+st.subheader(f"📊 Current Risk as of {current_date}")
 
-# Convert to DataFrame
-risk_df = pd.DataFrame(display_rows)
+color_map = {"HIGH": "🔴 HIGH", "MEDIUM": "🟡 MEDIUM", "LOW": "🟢 LOW"}
+st.markdown(f"### **Current Carry Trade Risk: {color_map.get(current_risk, current_risk)}**")
 
-# Show the table in Streamlit and console
-if not risk_df.empty:
+# Filter HIGH risk only and display
+data_high = data[data["Risk"] == "HIGH"].copy()
+data_high.reset_index(inplace=True)
+data_high.rename(columns={"index": "Date"}, inplace=True)
+data_high["Date"] = data_high["Date"].dt.strftime("%Y-%m-%d")
+
+if not data_high.empty:
     st.subheader("📅 All Dates With HIGH Risk (Last 12 Years)")
-    st.dataframe(risk_df, use_container_width=True)
-    print("\nYen Carry Trade - HIGH Risk Events")
-    print(risk_df.to_string(index=False))
+    styled_df = data_high[["Date", "VIX", "UVXY", "FX_vol", "Risk"]].style.applymap(risk_color, subset=["Risk"])
+    st.dataframe(styled_df, use_container_width=True)
 else:
     st.info("No HIGH risk levels detected in the past 12 years.")
-    print("No HIGH risk levels detected.")

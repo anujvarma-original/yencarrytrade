@@ -47,7 +47,8 @@ def send_email_alert(risk_level, data_today):
     metrics = []
     for col, val in data_today.items():
         try:
-            val_formatted = f"{float(val):.4f}"
+            val = float(val)
+            val_formatted = "{:.4f}".format(val)
         except (ValueError, TypeError):
             val_formatted = str(val)
         metrics.append(f"{col}: {val_formatted}")

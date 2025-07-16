@@ -1,75 +1,54 @@
-# carry_trade_app.py
+# yen_carry_trade_risk.py
+
 import streamlit as st
+import yfinance as yf
 import pandas as pd
 import numpy as np
-import yfinance as yf
-from sklearn.ensemble import RandomForestClassifier
-from joblib import load
-import smtplib
-from email.mime.text import MIMEText
+import datetime
 
-# Load or simulate model (replace with actual trained model path)
-def load_model():
-    try:
-        return load("carry_model.joblib")
-    except:
-        # Simulated placeholder classifier
-        class DummyModel:
-            def predict(self, X):
-                return [
-                    "High" if float(vix) > 20 and float(vol) > 0.01 else "Low"
-                    for vix, vol in zip(X["VIX"].values, X["FX_vol"].values)
-                ]
-        return DummyModel()
+# Streamlit setup
+st.set_page_config(page_title="Yen Carry Trade Risk", layout="centered")
+st.title("\U0001F4B4 Current Yen Carry Trade Risk")
 
-# Get current market data
-def fetch_data():
-    fx = yf.download("JPY=X", period="90d", interval="1d")["Close"]
-    vix = yf.download("^VIX", period="90d", interval="1d")["Close"]
+# Function to classify risk level
+def classify_risk(vix, fx_vol):
+    if vix > 20 and fx_vol > 0.01:
+        return "HIGH"
+    elif vix > 15:
+        return "MEDIUM"
+    else:
+        return "LOW"
 
-    log_returns = np.log(fx / fx.shift(1))
-    fx_vol = log_returns.rolling(window=30).std().iloc[-1] * np.sqrt(252)
+# Fetch recent data (last 3 months)
+end = datetime.date.today()
+start = end - datetime.timedelta(days=90)
 
-    jpy_rate = 0.1  # Simulated
-    usd_rate = 5.25  # Simulated
-    IRD = usd_rate - jpy_rate
+vix_data = yf.download("^VIX", start=start, end=end, interval="1d")
+fx_data = yf.download("JPY=X", start=start, end=end, interval="1d")
 
-    vix_today = vix.iloc[-1]
+if vix_data.empty or fx_data.empty:
+    st.error("Failed to download data from Yahoo Finance.")
+    raise SystemExit("Data fetch failed")
 
-    X_today = pd.DataFrame.from_dict({
-        "IRD": [IRD],
-        "FX_vol": [fx_vol],
-        "VIX": [vix_today],
-        "JPY_USD_roc": [log_returns.iloc[-1]]
-    })
+# Calculate rolling volatility of FX
+fx_data["log_ret"] = np.log(fx_data["Close"] / fx_data["Close"].shift(1))
+fx_data["FX_vol"] = fx_data["log_ret"].rolling(window=20).std().iloc[-1] * np.sqrt(252)
 
-    return X_today
+# Current VIX
+vix_today = vix_data["Close"].iloc[-1]
+fx_vol_today = fx_data["FX_vol"]
 
-# Send email alert if risk is HIGH
-def send_email_alert(risk_level):
-    if risk_level != "High":
-        return
+# Compute risk
+risk_level = classify_risk(vix_today, fx_vol_today)
 
-    email_cfg = st.secrets["email"]
+# Output
+st.subheader("Today's Carry Trade Risk")
+st.write("VIX:", round(vix_today, 2))
+st.write("FX Volatility:", round(fx_vol_today, 4))
+st.markdown("### Risk Level: **{}**".format(risk_level))
 
-    msg = MIMEText("\u26a0\ufe0f Alert: Today's carry trade risk is HIGH.")
-    msg["Subject"] = "Yen Carry Trade Risk Alert"
-    msg["From"] = email_cfg["from"]
-    msg["To"] = email_cfg["to"]
-
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(email_cfg["from"], email_cfg["password"])
-        server.send_message(msg)
-
-# Streamlit app
-st.title("Yen Carry Trade Risk Tracker")
-st.markdown("Updated daily with live FX and VIX data")
-
-model = load_model()
-data_today = fetch_data()
-risk_prediction = model.predict(data_today)[0]
-send_email_alert(risk_prediction)
-
-st.metric(label="Today's Carry Trade Risk", value=risk_prediction)
-st.write("**Inputs:**")
-st.dataframe(data_today.round(4))
+print("--- Yen Carry Trade Risk ---")
+print("Date:", end)
+print("VIX:", round(vix_today, 2))
+print("FX Volatility:", round(fx_vol_today, 4))
+print("Risk Level:", risk_level)

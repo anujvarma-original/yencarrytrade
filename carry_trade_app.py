@@ -1,4 +1,4 @@
-# carry_trade_app.py (corrected formatting bug for email metric values)
+# carry_trade_app.py (final correction to email metrics formatting)
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -44,10 +44,15 @@ def send_email_alert(risk_level, data_today):
     if isinstance(data_today, pd.DataFrame):
         data_today = data_today.iloc[0]
 
-    metrics = "\n".join(
-        f"{col}: {val:.4f}" if isinstance(val, (int, float)) and not isinstance(val, bool) else f"{col}: {val}"
-        for col, val in data_today.items()
-    )
+    metrics = []
+    for col, val in data_today.items():
+        try:
+            val_formatted = f"{float(val):.4f}"
+        except (ValueError, TypeError):
+            val_formatted = str(val)
+        metrics.append(f"{col}: {val_formatted}")
+
+    metrics_str = "\n".join(metrics)
 
     body = f"""\u26a0\ufe0f Carry Trade Risk Alert
 
@@ -55,7 +60,7 @@ Risk Level: {risk_level.upper()}
 Timestamp: {timestamp}
 
 \ud83d\udcca Market Inputs:
-{metrics}
+{metrics_str}
 """
 
     msg = MIMEText(body)

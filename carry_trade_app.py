@@ -12,6 +12,8 @@ st.title("\U0001F4B4 Current Yen Carry Trade Risk")
 
 # Function to classify risk level
 def classify_risk(vix, fx_vol):
+    vix = vix.item() if hasattr(vix, 'item') else float(vix)
+    fx_vol = fx_vol.item() if hasattr(fx_vol, 'item') else float(fx_vol)
     if vix > 20 and fx_vol > 0.01:
         return "HIGH"
     elif vix > 15:

@@ -1,4 +1,4 @@
-# yen_carry_trade_risk.py
+# yen_carry_trade_risk.py (fixed ambiguous Series truth value error)
 
 import streamlit as st
 import yfinance as yf
@@ -32,11 +32,11 @@ if vix_data.empty or fx_data.empty:
 
 # Calculate rolling volatility of FX
 fx_data["log_ret"] = np.log(fx_data["Close"] / fx_data["Close"].shift(1))
-fx_data["FX_vol"] = fx_data["log_ret"].rolling(window=20).std().iloc[-1] * np.sqrt(252)
+fx_data["FX_vol"] = fx_data["log_ret"].rolling(window=20).std() * np.sqrt(252)
 
-# Current VIX
+# Current VIX and FX Volatility (extract last value)
 vix_today = vix_data["Close"].iloc[-1]
-fx_vol_today = fx_data["FX_vol"]
+fx_vol_today = fx_data["FX_vol"].iloc[-1]
 
 # Compute risk
 risk_level = classify_risk(vix_today, fx_vol_today)

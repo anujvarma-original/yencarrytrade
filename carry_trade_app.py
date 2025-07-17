@@ -1,56 +1,54 @@
-# yen_carry_trade_risk.py (fixed ambiguous Series truth value error)
-
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import numpy as np
 import datetime
 
-# Streamlit setup
 st.set_page_config(page_title="Yen Carry Trade Risk", layout="centered")
-st.title("\U0001F4B4 Current Yen Carry Trade Risk")
+st.title("📉 12-Month VIX & UVXY Carry Trade Risk Levels")
 
-# Function to classify risk level
-def classify_risk(vix, fx_vol):
-    vix = vix.item() if hasattr(vix, 'item') else float(vix)
-    fx_vol = fx_vol.item() if hasattr(fx_vol, 'item') else float(fx_vol)
-    if vix > 20 and fx_vol > 0.01:
+# Define date range
+end_date = datetime.date.today()
+start_date = end_date - datetime.timedelta(days=365)
+
+# Download data
+vix_data = yf.download("^VIX", start=start_date, end=end_date, interval="1wk")
+uvxy_data = yf.download("UVXY", start=start_date, end=end_date, interval="1wk")
+
+# Build DataFrame
+df = pd.DataFrame(index=vix_data.index)
+df["VIX"] = vix_data["Close"]
+df["UVXY"] = uvxy_data["Close"]
+df.dropna(inplace=True)
+
+# Classify risk level
+def classify_risk(vix):
+    if vix > 20:
         return "HIGH"
     elif vix > 15:
         return "MEDIUM"
     else:
         return "LOW"
 
-# Fetch recent data (last 3 months)
-end = datetime.date.today()
-start = end - datetime.timedelta(days=90)
+df["Risk"] = df["VIX"].apply(classify_risk)
+df["Date"] = df.index.strftime("%Y-%m-%d")
+df = df[["Date", "VIX", "UVXY", "Risk"]]
+df = df[df["Risk"].isin(["HIGH", "MEDIUM"])]
+df.sort_values("Date", ascending=False, inplace=True)
 
-vix_data = yf.download("^VIX", start=start, end=end, interval="1d")
-fx_data = yf.download("JPY=X", start=start, end=end, interval="1d")
+# Style the dataframe
+def highlight_row(row):
+    if row["Risk"] == "HIGH":
+        return ["background-color: #ffcccc"] * len(row)
+    elif row["Risk"] == "MEDIUM":
+        return ["background-color: #fff3cd"] * len(row)
+    else:
+        return [""] * len(row)
 
-if vix_data.empty or fx_data.empty:
-    st.error("Failed to download data from Yahoo Finance.")
-    raise SystemExit("Data fetch failed")
+styled_df = df.style.apply(highlight_row, axis=1).format({"VIX": "{:.2f}", "UVXY": "{:.2f}"})
 
-# Calculate rolling volatility of FX
-fx_data["log_ret"] = np.log(fx_data["Close"] / fx_data["Close"].shift(1))
-fx_data["FX_vol"] = fx_data["log_ret"].rolling(window=20).std() * np.sqrt(252)
+# Display in browser
+st.subheader("📅 Weekly Carry Trade Risk Flags (VIX > 15)")
+st.dataframe(styled_df, use_container_width=True)
 
-# Current VIX and FX Volatility (extract last value)
-vix_today = vix_data["Close"].iloc[-1]
-fx_vol_today = fx_data["FX_vol"].iloc[-1]
-
-# Compute risk
-risk_level = classify_risk(vix_today, fx_vol_today)
-
-# Output
-st.subheader("Today's Carry Trade Risk")
-st.write("VIX:", round(vix_today, 2))
-st.write("FX Volatility:", round(fx_vol_today, 4))
-st.markdown("### Risk Level: **{}**".format(risk_level))
-
-print("--- Yen Carry Trade Risk ---")
-print("Date:", end)
-print("VIX:", round(vix_today, 2))
-print("FX Volatility:", round(fx_vol_today, 4))
-print("Risk Level:", risk_level)
+# Also print in console (optional)
+print(df.to_string(index=False))

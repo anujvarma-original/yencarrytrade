@@ -1,3 +1,5 @@
+# carry_trade_app.py (fixed: date conflict + sorting + color-coded display)
+
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -30,10 +32,17 @@ def classify_risk(vix):
         return "LOW"
 
 df["Risk"] = df["VIX"].apply(classify_risk)
-df["Date"] = df.index.strftime("%Y-%m-%d")
-df = df[["Date", "VIX", "UVXY", "Risk"]]
+
+# Reset index to fix 'Date' ambiguity and allow sorting
+df = df.reset_index()
+df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
+
+# Filter only HIGH and MEDIUM, sort by descending date
 df = df[df["Risk"].isin(["HIGH", "MEDIUM"])]
-df.sort_values("Date", ascending=False, inplace=True)
+df = df.sort_values("Date", ascending=False)
+
+# Reorder columns
+df = df[["Date", "VIX", "UVXY", "Risk"]]
 
 # Style the dataframe
 def highlight_row(row):
@@ -44,11 +53,15 @@ def highlight_row(row):
     else:
         return [""] * len(row)
 
-styled_df = df.style.apply(highlight_row, axis=1).format({"VIX": "{:.2f}", "UVXY": "{:.2f}"})
+styled_df = df.style.apply(highlight_row, axis=1).format({
+    "VIX": "{:.2f}",
+    "UVXY": "{:.2f}"
+})
 
 # Display in browser
 st.subheader("📅 Weekly Carry Trade Risk Flags (VIX > 15)")
 st.dataframe(styled_df, use_container_width=True)
 
 # Also print in console (optional)
+print("\nCarry Trade Risk Levels - Last 12 Months (HIGH and MEDIUM only):")
 print(df.to_string(index=False))

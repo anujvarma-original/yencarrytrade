@@ -2,7 +2,7 @@ name: Wake Streamlit App Twice Daily
 
 on:
   schedule:
-    - cron: '0 */12 * * *'  # Every 12 hours
+    - cron: '0 */12 * * *'  # Every 12 hours UTC
   workflow_dispatch:
 
 jobs:
@@ -11,11 +11,12 @@ jobs:
     steps:
       - name: Warm up sleeping Streamlit app with browser-style curl
         run: |
-          echo "Waking Streamlit app at https://yencarrytrade.streamlit.app/"
+          echo "🔔 Attempting to wake Streamlit app at https://yencarrytrade.streamlit.app/"
 
-          for i in {1..8}; do
+          for i in {1..12}; do
             HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-              -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+              -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" \
+              --compressed \
               https://yencarrytrade.streamlit.app/)
 
             echo "Attempt $i: HTTP $HTTP_STATUS"
@@ -25,9 +26,9 @@ jobs:
               exit 0
             fi
 
-            echo "⏳ Still sleeping... waiting 15 seconds before retrying."
-            sleep 15
+            echo "⏳ Still sleeping... waiting 20 seconds before retrying."
+            sleep 20
           done
 
-          echo "❌ Failed to wake Streamlit app after 8 attempts."
+          echo "❌ Failed to wake Streamlit app after 12 attempts."
           exit 1

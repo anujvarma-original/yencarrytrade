@@ -1,34 +1,30 @@
-name: Wake Streamlit App Twice Daily
+name: Wake Streamlit App Daily
 
 on:
   schedule:
-    - cron: '0 */12 * * *'  # Every 12 hours UTC
+    - cron: '0 6 * * *'  # Once daily at 6:00 AM UTC
   workflow_dispatch:
 
 jobs:
   wake-streamlit:
     runs-on: ubuntu-latest
     steps:
-      - name: Warm up sleeping Streamlit app with browser-style curl
+      - name: Wait before pinging (optional)
+        run: sleep 30  # Waits for 30 seconds (adjust if needed)
+
+      - name: Wake Streamlit app with browser-style curl
         run: |
-          echo "🔔 Attempting to wake Streamlit app at https://yencarrytrade.streamlit.app/"
+          echo "Waking Streamlit app at https://yencarrytrade.streamlit.app/"
 
-          for i in {1..12}; do
-            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-              -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" \
-              --compressed \
-              https://yencarrytrade.streamlit.app/)
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+            https://yencarrytrade.streamlit.app/)
 
-            echo "Attempt $i: HTTP $HTTP_STATUS"
+          echo "HTTP status: $HTTP_STATUS"
 
-            if [ "$HTTP_STATUS" -eq 200 ]; then
-              echo "✅ Streamlit app is awake and responsive."
-              exit 0
-            fi
-
-            echo "⏳ Still sleeping... waiting 20 seconds before retrying."
-            sleep 20
-          done
-
-          echo "❌ Failed to wake Streamlit app after 12 attempts."
-          exit 1
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "✅ Streamlit app is awake and responsive."
+          else
+            echo "❌ Failed to wake Streamlit app. HTTP status: $HTTP_STATUS"
+            exit 1
+          fi

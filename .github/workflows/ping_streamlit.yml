@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Wait before pinging (optional)
-        run: sleep 30  # Waits for 30 seconds (adjust if needed)
+        run: sleep 80  # Waits for 80 seconds (adjust if needed)
 
       - name: Wake Streamlit app with browser-style curl
         run: |

@@ -7,7 +7,7 @@ import smtplib
 from email.mime.text import MIMEText
 import os
 import numpy as np
-from fredapi import Fred
+import requests
 
 st.set_page_config(page_title="Yen Carry Trade Risk", layout="centered")
 st.title("📉 Enhanced Yen Carry Trade Risk Levels")
@@ -16,8 +16,19 @@ ALERT_FLAG = "/tmp/last_yen_alert.txt"
 end_date = datetime.date.today()
 start_date = end_date - datetime.timedelta(days=365)
 
-# FRED API setup
-fred = Fred(api_key=st.secrets["fred"]["api_key"])
+# Fetch Japan GDP growth directly from FRED API
+def get_japan_gdp_growth(api_key):
+    try:
+        url = f"https://api.stlouisfed.org/fred/series/observations?series_id=JPNNGDP&api_key={api_key}&file_type=json"
+        response = requests.get(url)
+        data = response.json()["observations"]
+        if len(data) >= 5:
+            latest = float(data[-1]["value"])
+            previous = float(data[-5]["value"])
+            return ((latest - previous) / previous) * 100
+    except Exception as e:
+        st.warning(f"⚠️ GDP API fallback used: {e}")
+    return 1.1  # fallback value
 
 # Download market data
 def safe_download(ticker, *args, **kwargs):
@@ -66,13 +77,8 @@ if df.empty:
 # Calculate Interest Rate Differential
 df["Rate_Diff"] = df["US_Rate"] - df["Japan_Rate"]
 
-# Get Japan GDP growth from FRED (fallback value included)
-try:
-    gdp_series = fred.get_series('JPNNGDP')
-    latest_gdp_growth = (gdp_series[-1] - gdp_series[-5]) / gdp_series[-5] * 100
-except Exception as e:
-    latest_gdp_growth = 1.1
-    st.warning(f"GDP data fallback due to error: {e}")
+# Get Japan GDP growth
+latest_gdp_growth = get_japan_gdp_growth(st.secrets["fred"]["api_key"])
 
 # Static macro indicators
 latest_inflation = 2.5  # Replace with API if needed

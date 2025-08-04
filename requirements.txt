@@ -9,6 +9,7 @@ smtplib3  # usually built-in, but list if containerized
 
 # FRED API for GDP
 fredapi>=0.5.0
+pandas_datareader>=0.10.0
 
 # Optional: For robust date parsing and compatibility
 python-dateutil>=2.8

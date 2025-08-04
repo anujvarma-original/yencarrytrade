@@ -160,9 +160,9 @@ def send_email_alert(risk_level, date_str, vix_val, uvxy_val):
 
     email_cfg = st.secrets["email"]
 
-    body = f"""\ud83d\udea8 Carry Trade Risk Alert\n\nRisk Level: {risk_level}\nDate: {date_str}\nVIX: {vix_val:.2f}\nUVXY: {uvxy_val:.2f}\n"""
+    body = f"""🚨 Carry Trade Risk Alert\n\nRisk Level: {risk_level}\nDate: {date_str}\nVIX: {vix_val:.2f}\nUVXY: {uvxy_val:.2f}\n"""
 
-    msg = MIMEText(body)
+    msg = MIMEText(body, _charset="utf-8")
     msg["Subject"] = f"Carry Trade Risk Alert - {risk_level} on {date_str}"
     msg["From"] = email_cfg["from"]
     msg["To"] = email_cfg["to"]

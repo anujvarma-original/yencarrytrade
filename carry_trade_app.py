@@ -7,6 +7,7 @@ import smtplib
 from email.mime.text import MIMEText
 import os
 import numpy as np
+from fredapi import Fred
 
 st.set_page_config(page_title="Yen Carry Trade Risk", layout="centered")
 st.title("📉 Enhanced Yen Carry Trade Risk Levels")
@@ -15,12 +16,25 @@ ALERT_FLAG = "/tmp/last_yen_alert.txt"
 end_date = datetime.date.today()
 start_date = end_date - datetime.timedelta(days=365)
 
+# FRED API setup
+fred = Fred(api_key=st.secrets["fred"]["api_key"])
+
 # Download market data
-vix_data = yf.download("^VIX", start=start_date, end=end_date, interval="1wk")
-uvxy_data = yf.download("UVXY", start=start_date, end=end_date, interval="1wk")
-us_rate = yf.download("^IRX", start=start_date, end=end_date, interval="1wk")
-japan_rate = yf.download("JP3YT=RR", start=start_date, end=end_date, interval="1wk")
-usd_jpy_data = yf.download("JPY=X", start=start_date, end=end_date, interval="1wk")
+def safe_download(ticker, *args, **kwargs):
+    try:
+        df = yf.download(ticker, *args, **kwargs)
+        if df.empty:
+            st.warning(f"⚠️ Data for {ticker} is empty.")
+        return df
+    except Exception as e:
+        st.warning(f"⚠️ Failed to download {ticker}: {e}")
+        return pd.DataFrame()
+
+vix_data = safe_download("^VIX", start=start_date, end=end_date, interval="1wk")
+uvxy_data = safe_download("UVXY", start=start_date, end=end_date, interval="1wk")
+us_rate = safe_download("^IRX", start=start_date, end=end_date, interval="1wk")
+japan_rate = safe_download("JP3YT=RR", start=start_date, end=end_date, interval="1wk")
+usd_jpy_data = safe_download("JPY=X", start=start_date, end=end_date, interval="1wk")
 
 # Prepare DataFrame
 df = pd.DataFrame(index=vix_data.index)
@@ -34,9 +48,16 @@ df.dropna(inplace=True)
 # Calculate Interest Rate Differential
 df["Rate_Diff"] = df["US_Rate"] - df["Japan_Rate"]
 
-# Static macro indicators (replace with real-time API integration if needed)
-latest_gdp_growth = 1.1  # %
-latest_inflation = 2.5   # %
+# Get Japan GDP growth from FRED (fallback value included)
+try:
+    gdp_series = fred.get_series('JPNNGDP')
+    latest_gdp_growth = (gdp_series[-1] - gdp_series[-5]) / gdp_series[-5] * 100
+except Exception as e:
+    latest_gdp_growth = 1.1
+    st.warning(f"GDP data fallback due to error: {e}")
+
+# Static macro indicators
+latest_inflation = 2.5  # Replace with API if needed
 boj_policy_stance = "Dovish"  # Options: Dovish, Hawkish
 
 # Enhanced Risk Classification
@@ -58,6 +79,10 @@ df["Risk"] = df.apply(lambda row: classify_enhanced_risk(
     latest_gdp_growth,
     boj_policy_stance
 ), axis=1)
+
+if df.empty:
+    st.error("No data available to compute risk. Check data sources.")
+    st.stop()
 
 latest_row = df.iloc[-1]
 current_risk = latest_row["Risk"]
@@ -92,11 +117,8 @@ styled_df = filtered_df.style.apply(highlight_risk, axis=1).format({
 st.subheader("🗓️ Recent HIGH & MEDIUM Risk Events")
 st.dataframe(styled_df, use_container_width=True)
 
-# Console output
 print("\nCarry Trade Risk - Recent HIGH and MEDIUM Events:")
 print(filtered_df.to_string(index=False))
-
-# Email Alert
 
 def should_send_alert():
     if not os.path.exists(ALERT_FLAG):

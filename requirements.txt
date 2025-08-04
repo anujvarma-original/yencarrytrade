@@ -1,8 +1,20 @@
-streamlit
-pandas
-numpy
-yfinance
 scikit-learn
 joblib
-twilio
 matplotlib
+# Core App
+streamlit>=1.27
+yfinance>=0.2.30
+pandas>=1.5
+numpy>=1.24
+
+# Email
+smtplib3  # usually built-in, but list if containerized
+
+# FRED API for GDP
+fredapi>=0.5.0
+
+# Optional: For robust date parsing and compatibility
+python-dateutil>=2.8
+
+# Optional: To run on Heroku or containers with clean Unicode rendering
+toml>=0.10.2

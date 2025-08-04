@@ -50,13 +50,17 @@ df["VIX"] = vix_data["Close"]
 df["UVXY"] = uvxy_data["Close"]
 df["US_Rate"] = us_rate["Close"]
 df["Japan_Rate"] = japan_rate
-if "Close" in usd_jpy_data:
-    df["USD_JPY"] = usd_jpy_data["Close"]
-df.dropna(inplace=True)
 
-# Stop early if data is empty
+if "Close" in usd_jpy_data and not usd_jpy_data["Close"].empty:
+    df["USD_JPY"] = usd_jpy_data["Close"]
+else:
+    st.warning("⚠️ USD/JPY data missing. Using fallback value of 145.")
+    df["USD_JPY"] = pd.Series([145] * len(df), index=df.index)
+
+# Clean and validate
+df.dropna(inplace=True)
 if df.empty:
-    st.error("📉 No data available to compute risk — likely due to missing data sources.")
+    st.error("📉 Final dataset is empty. Check for failed data sources.")
     st.stop()
 
 # Calculate Interest Rate Differential

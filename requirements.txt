@@ -4,9 +4,6 @@ yfinance>=0.2.30
 pandas>=1.5
 numpy>=1.24
 
-# Email
-smtplib3  # usually built-in, but list if containerized
-
 # FRED API for GDP
 requests>=2.28
 

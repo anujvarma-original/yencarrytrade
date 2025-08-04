@@ -129,4 +129,56 @@ def highlight_risk(row):
 
 styled_df = filtered_df.style.apply(highlight_risk, axis=1).format({
     "VIX": "{:.2f}",
-    "UVXY": "{:.2f}
+    "UVXY": "{:.2f}",
+    "USD_JPY": "{:.2f}",
+    "Rate_Diff": "{:.2f}"
+})
+
+st.subheader("🗓️ Recent HIGH & MEDIUM Risk Events")
+st.dataframe(styled_df, use_container_width=True)
+
+print("\nCarry Trade Risk - Recent HIGH and MEDIUM Events:")
+print(filtered_df.to_string(index=False))
+
+def should_send_alert():
+    if not os.path.exists(ALERT_FLAG):
+        return True
+    try:
+        with open(ALERT_FLAG, "r") as f:
+            last_time = datetime.datetime.fromisoformat(f.read().strip())
+        return (datetime.datetime.utcnow() - last_time).total_seconds() > 43200
+    except:
+        return True
+
+def update_alert_timestamp():
+    with open(ALERT_FLAG, "w") as f:
+        f.write(datetime.datetime.utcnow().isoformat())
+
+def send_email_alert(risk_level, date_str, vix_val, uvxy_val):
+    if risk_level != "HIGH" or not should_send_alert():
+        return
+
+    email_cfg = st.secrets["email"]
+
+    try:
+        body = f"""🚨 Carry Trade Risk Alert\n\nRisk Level: {risk_level}\nDate: {date_str}\nVIX: {vix_val:.2f}\nUVXY: {uvxy_val:.2f}\n"""
+        # Plaintext fallback without emoji
+        fallback_body = f"Carry Trade Risk Alert\n\nRisk Level: {risk_level}\nDate: {date_str}\nVIX: {vix_val:.2f}\nUVXY: {uvxy_val:.2f}"
+        try:
+            msg = MIMEText(body, _charset="utf-8")
+        except UnicodeEncodeError:
+            msg = MIMEText(fallback_body, _charset="utf-8")
+
+        msg["Subject"] = f"Carry Trade Risk Alert - {risk_level} on {date_str}"
+        msg["From"] = email_cfg["from"]
+        msg["To"] = email_cfg["to"]
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(email_cfg["from"], email_cfg["password"])
+            server.send_message(msg)
+        update_alert_timestamp()
+        st.success("📧 Alert email sent for HIGH risk.")
+    except Exception as e:
+        st.error(f"Failed to send email: {e}")
+
+send_email_alert(current_risk, current_date, latest_row["VIX"], latest_row["UVXY"])

@@ -33,7 +33,15 @@ def safe_download(ticker, *args, **kwargs):
 vix_data = safe_download("^VIX", start=start_date, end=end_date, interval="1wk")
 uvxy_data = safe_download("UVXY", start=start_date, end=end_date, interval="1wk")
 us_rate = safe_download("^IRX", start=start_date, end=end_date, interval="1wk")
-japan_rate = safe_download("JP3YT=RR", start=start_date, end=end_date, interval="1wk")
+
+# Attempt to get Japan Rate
+japan_rate_data = safe_download("JP3YT=RR", start=start_date, end=end_date, interval="1wk")
+if "Close" in japan_rate_data and not japan_rate_data["Close"].empty:
+    japan_rate = japan_rate_data["Close"]
+else:
+    st.warning("⚠️ Japan rate data not available. Using fallback value of 0.1%.")
+    japan_rate = pd.Series([0.1] * len(vix_data), index=vix_data.index)
+
 usd_jpy_data = safe_download("JPY=X", start=start_date, end=end_date, interval="1wk")
 
 # Prepare DataFrame
@@ -41,9 +49,15 @@ df = pd.DataFrame(index=vix_data.index)
 df["VIX"] = vix_data["Close"]
 df["UVXY"] = uvxy_data["Close"]
 df["US_Rate"] = us_rate["Close"]
-df["Japan_Rate"] = japan_rate["Close"]
-df["USD_JPY"] = usd_jpy_data["Close"]
+df["Japan_Rate"] = japan_rate
+if "Close" in usd_jpy_data:
+    df["USD_JPY"] = usd_jpy_data["Close"]
 df.dropna(inplace=True)
+
+# Stop early if data is empty
+if df.empty:
+    st.error("📉 No data available to compute risk — likely due to missing data sources.")
+    st.stop()
 
 # Calculate Interest Rate Differential
 df["Rate_Diff"] = df["US_Rate"] - df["Japan_Rate"]
@@ -79,10 +93,6 @@ df["Risk"] = df.apply(lambda row: classify_enhanced_risk(
     latest_gdp_growth,
     boj_policy_stance
 ), axis=1)
-
-if df.empty:
-    st.error("No data available to compute risk. Check data sources.")
-    st.stop()
 
 latest_row = df.iloc[-1]
 current_risk = latest_row["Risk"]

@@ -116,6 +116,56 @@ risk_color = {
 
 st.markdown(f"### 🟢 Current Carry Trade Risk: <span style='color:{risk_color[current_risk]}'>{current_risk}</span>", unsafe_allow_html=True)
 
+# 📊 Inputs + thresholds used for classification
+st.subheader("📊 Inputs Used for Risk Analysis (with Triggers)")
+
+# Define thresholds for HIGH risk
+thresholds = {
+    "VIX": {"value": 20, "direction": "above"},
+    "USD/JPY": {"value": 135, "direction": "below"},
+    "Rate Differential (US - Japan)": {"value": 0, "direction": "below"},
+    "Japan GDP Growth (YoY)": {"value": 1, "direction": "below"},
+    "US Inflation (Est.)": {"value": 3, "direction": "above"},
+    "BoJ Policy Stance": {"value": "Hawkish"}
+}
+
+# Extract values from latest row
+input_values = {
+    "VIX": latest_row["VIX"],
+    "USD/JPY": latest_row["USD_JPY"],
+    "Rate Differential (US - Japan)": latest_row["Rate_Diff"],
+    "Japan GDP Growth (YoY)": latest_gdp_growth,
+    "US Inflation (Est.)": latest_inflation,
+    "BoJ Policy Stance": boj_policy_stance
+}
+
+# Determine trigger status
+trigger_flags = {}
+for key, val in input_values.items():
+    if key == "BoJ Policy Stance":
+        trigger_flags[key] = "⚠️" if val == thresholds[key]["value"] else ""
+    else:
+        if thresholds[key]["direction"] == "above":
+            trigger_flags[key] = "⚠️" if val > thresholds[key]["value"] else ""
+        elif thresholds[key]["direction"] == "below":
+            trigger_flags[key] = "⚠️" if val < thresholds[key]["value"] else ""
+
+# Construct DataFrame for display
+data_rows = []
+for key in input_values:
+    data_rows.append({
+        "Factor": key,
+        "Value": f"{input_values[key]:.2f}" if isinstance(input_values[key], (float, int)) else input_values[key],
+        "Threshold": f"{thresholds[key]['direction']} {thresholds[key]['value']}" if key != "BoJ Policy Stance" else thresholds[key]["value"],
+        "Triggered": trigger_flags[key]
+    })
+
+input_df = pd.DataFrame(data_rows)
+st.dataframe(input_df.style.apply(
+    lambda row: ['background-color: #ffcccc' if row.Triggered == "⚠️" else '' for _ in row],
+    axis=1
+))
+
 filtered_df = df[df["Risk"].isin(["HIGH", "MEDIUM"])].sort_values("Date", ascending=False)
 filtered_df = filtered_df[["Date", "VIX", "UVXY", "USD_JPY", "Rate_Diff", "Risk"]]
 
